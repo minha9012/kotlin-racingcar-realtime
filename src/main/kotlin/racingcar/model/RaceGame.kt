@@ -8,16 +8,16 @@ class RaceGame(
 ) {
     fun getCars(): List<RacingCar> = cars
 
-    suspend fun runOneRound() {
-        cars.forEach { car ->
-            coroutineScope {
-                launch {
-                    val delayTime = RandomMovingRule.getDelayTime()
-                    car.moveForward(delayTime)
-                    println("${car.name} : ${"-".repeat(car.getPosition())}")
-                }
+    suspend fun runOneRound(car : RacingCar) {
+
+        coroutineScope {
+            launch {
+                val delayTime = RandomMovingRule.getDelayTime()
+                car.moveForward(delayTime)
+                println("${car.name} : ${"-".repeat(car.getPosition())}")
             }
         }
+
     }
 
     fun findWinners(goalDistance: Int): List<RacingCar> {
