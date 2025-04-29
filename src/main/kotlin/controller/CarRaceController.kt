@@ -22,12 +22,9 @@ class CarRaceController(
     private val pauseMutex = Mutex(locked = false)
 
     suspend fun start() {
-        cars.forEach { car ->
-            scope.launch {
-                startCar(car)
-            }
-        }
-         scope.launch { getNewCar() }
+        cars.forEach { car -> startCar(car) }
+
+        scope.launch { getNewCar() }
 
         jobs.joinAll()
     }
@@ -57,7 +54,7 @@ class CarRaceController(
 
     private suspend fun getNewCar() {
         withContext(Dispatchers.Default) {
-            while (!raceFinished.get()) {
+            while (!raceFinished.get() && scope.isActive) {
                 val inputWait = readln()
                 if(inputWait.isEmpty()) {
                     pauseMutex.withLock {
