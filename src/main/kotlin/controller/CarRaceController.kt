@@ -34,26 +34,26 @@ class CarRaceController(
             while (!raceFinished.get() && isActive) {
                 pauseMutex.withLock {
                     car.move()
-                    OutputView.printCarPosition(car.name, car.position)
-
-                    if (car.position >= goal && raceFinished.compareAndSet(false, true)) {
-                        OutputView.printWinner(car.name)
-                        cancelRace()
+                    withContext(Dispatchers.IO) {
+                        OutputView.printCarPosition(car.name, car.position)
                     }
                 }
 
+                if (car.position >= goal && raceFinished.compareAndSet(false, true)) {
+                    OutputView.printWinner(car.name)
+                    cancelRace()
+                }
             }
         }
         jobs.add(job)
     }
 
     private fun cancelRace() {
-
         jobs.forEach { it.cancel() }
     }
 
     private suspend fun getNewCar() {
-        withContext(Dispatchers.Default) {
+        withContext(Dispatchers.IO) {
             while (!raceFinished.get() && scope.isActive) {
                 val inputWait = readln()
                 if(inputWait.isEmpty()) {
