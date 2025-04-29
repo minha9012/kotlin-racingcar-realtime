@@ -23,13 +23,12 @@ class CarRaceController(
 
     suspend fun start() {
         cars.forEach { car ->
-            val job = scope.launch {
+            scope.launch {
                 startCar(car)
             }
-            jobs.add(job)
         }
-        val inputJob = scope.launch { getNewCar() }
-//        jobs.add(inputJob)
+         scope.launch { getNewCar() }
+
         jobs.joinAll()
     }
 
@@ -43,7 +42,6 @@ class CarRaceController(
                     if (car.position >= goal && raceFinished.compareAndSet(false, true)) {
                         OutputView.printWinner(car.name)
                         cancelRace()
-                        this.cancel()
                     }
                 }
 
