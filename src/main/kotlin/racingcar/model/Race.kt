@@ -3,9 +3,9 @@ package racingcar.model
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import racingcar.support.CarCommand
@@ -16,21 +16,25 @@ class Race(
     cars: List<Car>, // 방어적 복사 + 불변 객체 유지
     private val goal: Int,
     private val channel: Channel<Car> = Channel(Channel.UNLIMITED),
-    dispatcher: CoroutineDispatcher = Dispatchers.Default
+    dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val _cars: MutableList<Car> = cars.toMutableList()
     val cars: List<Car>
         get() = _cars.toList() // 외부에 링크할 때도 컬렉션의 헤드를 끊어버리기 위해 toList()
 
-    private val raceScope = CoroutineScope(dispatcher + SupervisorJob())
+    private val raceScope = CoroutineScope(dispatcher)
     private val isPaused = AtomicBoolean(false)
 
     suspend fun startRace() {
-        launchRace()
-        launchInput()
+        raceScope.launch {
+            launchRace()
+            launchInput()
+            readyForNewCar()
+        }.join()
     }
 
     private fun launchRace() {
+        println("Launching Race")
         _cars.map { car ->
             raceScope.launch {
                 goCar(car)
@@ -38,12 +42,12 @@ class Race(
         }
     }
 
-    private fun launchInput() {
+    private suspend fun launchInput() {
         raceScope.launch(Dispatchers.IO) {
             while (coroutineContext.isActive) {
-                val input = readlnOrNull()
+                val input = readlnOrNull() ?: continue
 
-                if (input != null && input.isBlank()) {
+                if (input.isBlank()) {
                     // 엔터만 쳤으면 -> 일시정지
                     isPaused.set(true)
 
@@ -58,7 +62,7 @@ class Race(
                     }
 
                     val (carCommand, carName) = command.split(" ")
-//                    handleCommand(CarCommand.valueOf(carCommand), cars.get(carName))
+                    handleCommand(CarCommand.valueOf(carCommand), carName)
 
                     println("$carCommand 명령어 처리 완료. 경주를 다시 시작합니다.")
                     isPaused.set(false)
@@ -67,19 +71,31 @@ class Race(
         }
     }
 
-    private suspend fun handleCommand(carCommand: CarCommand, car: String) {
+    private suspend fun handleCommand(carCommand: CarCommand, carName: String) {
+        val car = cars.find { it.name == carName } ?: Car(carName)
 
         when (carCommand) {
-            CarCommand.add -> readyForNewCar()
-            CarCommand.boost -> TODO()
-            CarCommand.slow -> TODO()
-            CarCommand.stop -> TODO()
+            CarCommand.add -> {
+                channel.send(car)
+            }
+
+            CarCommand.boost -> {
+                car.boost()
+            }
+
+            CarCommand.slow -> {
+                car.slow()
+            }
+
+            CarCommand.stop -> {
+                car.stop()
+            }
         }
     }
 
 
     private suspend fun readyForNewCar() {
-        while (coroutineContext.isActive) {
+        channel.consumeAsFlow().collect {
             while (!channel.isEmpty) {
                 val newCar = channel.receive()
                 println("${newCar.name} 참가 완료!")
